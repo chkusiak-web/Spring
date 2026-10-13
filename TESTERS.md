@@ -8,8 +8,9 @@ Download the file for your computer from the latest release:
 
 ## Mac
 1. Open the `.dmg` and drag Spring into Applications.
-2. The beta isn't signed by Apple yet, so the first time, **right-click Spring › Open › Open**.
-   If macOS only offers "Move to Trash", open **System Settings › Privacy & Security** and click **Open Anyway**.
+2. The beta isn't signed by Apple yet, so macOS blocks the first launch ("Apple could not verify…"). Click **Done**, then open
+   **System Settings › Privacy & Security**, scroll down, click **Open Anyway** next to Spring, and confirm. You only do this once.
+   If there's no Open Anyway button, run this in Terminal: `xattr -dr com.apple.quarantine /Applications/Spring.app`
 
 ## Windows
 1. Run the `.exe`. If Windows shows "Windows protected your PC", click **More info › Run anyway**.
