@@ -87,6 +87,7 @@ async function load() {
   finally { loading = null; }
 }
 async function unload() {
+  clearTimeout(idleTimer);
   const m = model, c = context;
   chat = null; context = null; model = null; grammars.clear();
   try { if (c) await c.dispose(); } catch {}
@@ -95,6 +96,7 @@ async function unload() {
 function touch() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => { queue = queue.then(unload, unload); }, IDLE_UNLOAD);
+  idleTimer.unref();   // never keep the process alive just to unload later
 }
 
 async function grammarFor(schema) {
