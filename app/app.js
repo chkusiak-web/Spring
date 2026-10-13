@@ -1394,7 +1394,7 @@ function settings() {
   const voices = nativeVoices.length ? nativeVoices : webVoices;
   render(shell('', `<div class="pagehead"><div class="label">Spring · 泉</div><h1>Settings</h1></div>
     <div class="label formhead">Voice</div><div class="form">
-      <div class="frow"><div><div class="lbl">Mandarin voice</div><div class="hint">${voices.length ? 'Premium voices sound most natural.' : 'No Mandarin voice found. Add one in System Settings › Accessibility › Spoken Content › System voice › Manage Voices › Chinese (China mainland).'}</div></div>
+      <div class="frow"><div><div class="lbl">Mandarin voice</div><div class="hint">${voices.length ? 'Premium voices sound most natural.' : (bridge.platform === 'win32' ? 'No Mandarin voice found. Add one in Windows Settings › Time & language › Language & region › Add a language › Chinese (Simplified, China), with Text-to-speech ticked, then restart Spring.' : 'No Mandarin voice found. Add one in System Settings › Accessibility › Spoken Content › System voice › Manage Voices › Chinese (China mainland).')}</div></div>
         ${voices.length ? `<select id="voice">${voices.map((v) => `<option ${v === st.voice ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>` : ''}</div>
       ${nativeVoices.length ? `<div class="frow"><div><div class="lbl">Women in Jinan</div><div class="hint">Grandma Wang, Teacher Lü, Xiao Xie, Sister Lin, Ms. Chen.</div></div>
         <div style="display:flex;gap:8px;align-items:center"><select id="voiceF">${voices.map((v) => `<option ${v === st.voiceF ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select><button class="icon-btn sm" id="testF" aria-label="Test">${I.speaker}</button></div></div>
@@ -1415,14 +1415,13 @@ function settings() {
         <select id="goal">${[3, 4, 5, 6, 7].map((n) => `<option ${n === S.weeklyGoal ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
       <div class="frow"><div><div class="lbl">Daily reminder</div><div class="hint">Skipped if you've already practiced that day.</div></div>
         <div style="display:flex;gap:12px;align-items:center"><input type="time" id="rtime" value="${st.reminderTime}"><button class="switch ${st.reminderOn ? 'on' : ''}" id="ron" aria-label="Daily reminder"></button></div></div>
-      <div class="frow"><div><div class="lbl">Open at login</div><div class="hint">Runs quietly in the background so reminders arrive. Closing the window keeps it running; ⌘Q quits.</div></div>
+      <div class="frow"><div><div class="lbl">Open at login</div><div class="hint">Runs quietly in the background so reminders arrive. ${bridge.platform === 'darwin' ? 'Closing the window keeps it running; ⌘Q quits.' : ''}</div></div>
         <button class="switch ${st.openAtLogin ? 'on' : ''}" id="login" aria-label="Open at login"></button></div>
     </div>
     <div class="label formhead">Jinan conversations · local AI</div><div class="form">
-      <div class="frow"><div><div class="lbl">Improvise with local AI</div><div class="hint">Characters follow hand-written scripts. When they don't understand you, a model running on this Mac (Ollama) improvises a reply and double-checks your grammar. Nothing goes online. Chats work without it.</div></div>
+      <div class="frow"><div><div class="lbl">Improvise with local AI</div><div class="hint">Characters follow hand-written scripts. When they don't understand you, an AI model running on this computer improvises a reply and double-checks your grammar. Nothing goes online. Chats work without it.</div></div>
         <button class="switch ${AI.cfg().on ? 'on' : ''}" id="aion" aria-label="Local AI"></button></div>
-      <div class="frow"><div><div class="lbl">Status</div><div class="hint" id="aihint">Checking…</div></div><button class="btn-outline" id="aichk">Check again</button></div>
-      <div class="frow"><div><div class="lbl">Model</div><div class="hint">Any Ollama chat model. Default: ${AI.DEF.model}</div></div><input id="aimodel" value="${esc(AI.cfg().model)}" spellcheck="false" style="width:200px"></div>
+      <div class="frow"><div><div class="lbl">AI model</div><div class="hint" id="aihint">Checking…</div></div><div id="aiact" style="display:flex;gap:10px"></div></div>
     </div>
     <div class="label formhead">Progress</div><div class="form">
       <div class="frow"><div><div class="lbl">Back up</div><div class="hint">Saves a file you can restore later. Daily backups are also kept automatically.</div></div><div style="display:flex;gap:10px"><button class="btn-outline" id="exp">Export</button><button class="btn-outline" id="imp">Import</button></div></div>
@@ -1447,20 +1446,23 @@ function settings() {
     on('#rtime', 'change', (e) => { st.reminderTime = e.target.value; syncReminder(); save(); });
     on('#ron', 'click', (e) => { st.reminderOn = !st.reminderOn; e.currentTarget.classList.toggle('on', st.reminderOn); syncReminder(); save(); });
     on('#login', 'click', (e) => { st.openAtLogin = !st.openAtLogin; e.currentTarget.classList.toggle('on', st.openAtLogin); bridge.setLogin(st.openAtLogin); save(); });
-    const aiShow = async (force) => {
-      const h = root.querySelector('#aihint'); if (!h) return;
-      h.textContent = 'Checking…';
-      const r = await AI.check(force); const m = AI.cfg().model;
-      if (!root.querySelector('#aihint')) return;
-      h.innerHTML = r.unsupported ? 'Available in the Mac app.'
-        : !r.running ? 'Ollama isn\'t running. To set it up: install Ollama from ollama.com, open it, then in Terminal run <code>ollama pull ' + esc(m) + '</code>. Plug in and turn off Low Power Mode for the best speed.'
-        : !r.hasModel ? 'Ollama is running, but ' + esc(m) + ' isn\'t downloaded. In Terminal run <code>ollama pull ' + esc(m) + '</code>.'
-        : '<b style="color:var(--spring)">Ready</b> · ' + esc(m) + ' on this Mac';
+    const gb = (n) => (n / 1e9).toFixed(1);
+    const aiPaint = (r) => {
+      const h = root.querySelector('#aihint'), act = root.querySelector('#aiact'); if (!h || !act) return;
+      const dl = r.download, low = r.ramGB && r.ramGB < 12 ? ` This computer has ${r.ramGB} GB of memory, so replies may be slow.` : '';
+      let btns = '';
+      if (r.unsupported) h.textContent = 'Available in the desktop app.';
+      else if (dl && !dl.error) { h.textContent = `Downloading… ${Math.floor(100 * dl.done / (dl.total || 1))}% (${gb(dl.done)} of ${gb(dl.total)} GB). You can keep studying.`; btns = '<button class="btn-outline" id="aicancel">Pause</button>'; }
+      else if (!r.hasModel) { h.textContent = (dl && dl.error ? 'The download stopped. It picks up where it left off. ' : '') + `One-time download, about ${gb(r.size)} GB. Works best with 16 GB of memory.` + low; btns = `<button class="btn-outline" id="aidl">${dl && dl.error ? 'Resume' : 'Download'}</button>`; }
+      else { h.innerHTML = '<b style="color:var(--spring)">Ready</b> · Qwen 3.5 (9B) on this computer.' + esc(low); btns = '<button class="btn-outline btn-danger" id="airm">Remove</button>'; }
+      act.innerHTML = btns;
+      on('#aidl', 'click', async () => aiPaint(await bridge.aiDownload()));
+      on('#aicancel', 'click', async () => aiPaint(await bridge.aiDownloadCancel()));
+      on('#airm', 'click', async () => { if (confirm(`Remove the AI model and free ${gb(r.size)} GB? You can download it again later.`)) aiPaint(await bridge.aiRemove()); });
     };
-    aiShow(true);
-    on('#aichk', 'click', () => aiShow(true));
+    AI.check(true).then(aiPaint);
+    if (bridge.onAiProgress) { const off = bridge.onAiProgress((r) => { if (!root.querySelector('#aihint')) return off(); aiPaint(r); AI.check(true); }); }
     on('#aion', 'click', (e) => { AI.cfg().on = !AI.cfg().on; e.currentTarget.classList.toggle('on', AI.cfg().on); save(); });
-    on('#aimodel', 'change', (e) => { AI.cfg().model = e.target.value.trim() || AI.DEF.model; save(); aiShow(true); });
     on('#exp', 'click', async () => { if (await bridge.exportData(S)) toast('Progress exported'); });
     on('#imp', 'click', async () => {
       const d = await bridge.importData();

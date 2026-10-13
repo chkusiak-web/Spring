@@ -1,0 +1,60 @@
+name: Build installers
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            dist: dist:mac
+          - os: windows-2022
+            dist: dist:win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The Mac runner is Apple Silicon; fetch the Intel llama.cpp binaries too so the x64 build has them.
+      - if: runner.os == 'macOS'
+        run: npm install --no-save --force @node-llama-cpp/mac-x64@$(node -p "require('node-llama-cpp/package.json').version")
+      - name: AI smoke test (small model of the same family)
+        run: node build/ai-smoke.js
+        env:
+          SPRING_MODEL_URI: hf:unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf
+          SPRING_MODEL_FILE: Qwen3.5-0.8B-Q4_K_M.gguf
+      - run: npm run ${{ matrix.dist }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Spring-${{ runner.os }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          files: out/*

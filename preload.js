@@ -14,6 +14,10 @@ contextBridge.exposeInMainWorld('api', {
   aiStatus: (model) => ipcRenderer.invoke('ai:status', model),
   aiChat: (req) => ipcRenderer.invoke('ai:chat', req),
   aiCancel: (id) => ipcRenderer.invoke('ai:cancel', id),
+  aiDownload: () => ipcRenderer.invoke('ai:download'),
+  aiDownloadCancel: () => ipcRenderer.invoke('ai:download-cancel'),
+  aiRemove: () => ipcRenderer.invoke('ai:remove'),
+  onAiProgress: (cb) => { const f = (e, d) => cb(d); ipcRenderer.on('ai:progress', f); return () => ipcRenderer.removeListener('ai:progress', f); },
   onAiToken: (cb) => { const f = (e, d) => cb(d); ipcRenderer.on('ai:token', f); return () => ipcRenderer.removeListener('ai:token', f); },
   platform: process.platform
 });

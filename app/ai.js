@@ -1,12 +1,12 @@
 'use strict';
-/* 天天 · local AI helper for Jinan conversations (Ollama on this Mac; fully offline, never required).
+/* Spring · local AI helper for Jinan conversations (built-in llama.cpp on this computer; fully offline, never required).
    The hand-written scripts (talk.js) stay in charge: they answer first, tick goals and give rule-based corrections.
    The local model only:
      · improvises an in-character reply when the script doesn't understand the learner;
      · double-checks the learner's sentence when the rules found nothing (shown as a softer "Tip");
      · translates its own improvised lines when clicked.
    Every call for a conversation shares one prompt prefix (character card + rules + conversation so far),
-   so Ollama can reuse its cache and later turns stay fast. */
+   so the model can reuse its cache and later turns stay fast. */
 const AI = (() => {
   const DEF = { on: true, model: 'qwen3.5:9b' };
   const cfg = () => { S.settings.ai = Object.assign({}, DEF, S.settings.ai || {}); return S.settings.ai; };

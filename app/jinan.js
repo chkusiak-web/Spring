@@ -631,7 +631,7 @@ function drawChat() {
       <div class="crole"><b>${esc(c.en)}</b> · ${esc(String(c.age))}<br>${esc(c.role)}</div>
       <div class="cvisit">${esc(stageNote(cid))}</div>
       ${live || mode === 'view' ? `<div class="csetting"><b>${esc(d.zh)} ${esc(d.en)}</b><br>${esc(q.setting)}</div>` : `<div class="csetting">${doneWith(cid)} of ${questsWith(cid).length} quests together</div>`}
-      ${live ? `<div class="cai ${AI.ready() ? 'on' : ''}" title="${AI.ready() ? 'When a character doesn\'t understand you, a model on this Mac improvises a reply and checks your grammar.' : 'Local AI is off or not set up (Settings). Characters follow their scripts.'}">${AI.ready() ? '● Local AI' : '○ Scripted only'}</div>` : ''}
+      ${live ? `<div class="cai ${AI.ready() ? 'on' : ''}" title="${AI.ready() ? 'When a character doesn\'t understand you, a model on this computer improvises a reply and checks your grammar.' : 'Local AI is off or not downloaded yet (Settings › AI model). Characters follow their scripts.'}">${AI.ready() ? '● Local AI' : '○ Scripted only'}</div>` : ''}
       <label class="cvoice">Voice <input type="checkbox" id="cvoice" ${JS().voice ? 'checked' : ''}></label>
       ${art ? '</div>' : ''}
     </div>`;

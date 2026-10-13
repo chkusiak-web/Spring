@@ -29,27 +29,29 @@ function createWindow() {
 }
 
 app.setName('Spring');
-// Keep using the 天天 data folder so progress, settings and keys carry over after the rename to Spring.
-app.setPath('userData', path.join(app.getPath('appData'), '天天'));
+app.setPath('userData', path.join(app.getPath('appData'), 'Spring'));
 app.setAboutPanelOptions({ applicationName: 'Spring', applicationVersion: app.getVersion(), version: '泉 · Quán', credits: 'Every day, a little Chinese.' });
 
-// Carry progress over from the old name (Quán / "Quan" data folder) the first time 天天 runs.
-function migrateFromQuan() {
+// Carry progress over from the app's older names (天天, then Quán) the first time Spring runs.
+function migrateOldData() {
   try {
     const f = dataFile();
     if (fs.existsSync(f)) return;
-    const oldDir = path.join(app.getPath('appData'), 'Quan');
-    const old = path.join(oldDir, 'progress.json');
-    if (!fs.existsSync(old)) return;
-    fs.mkdirSync(path.dirname(f), { recursive: true });
-    fs.copyFileSync(old, f);
-    const ob = path.join(oldDir, 'backups'), nb = path.join(path.dirname(f), 'backups');
-    if (fs.existsSync(ob)) { fs.mkdirSync(nb, { recursive: true }); for (const x of fs.readdirSync(ob)) fs.copyFileSync(path.join(ob, x), path.join(nb, x)); }
+    for (const name of ['天天', 'Quan']) {
+      const oldDir = path.join(app.getPath('appData'), name);
+      const old = path.join(oldDir, 'progress.json');
+      if (!fs.existsSync(old)) continue;
+      fs.mkdirSync(path.dirname(f), { recursive: true });
+      fs.copyFileSync(old, f);
+      const ob = path.join(oldDir, 'backups'), nb = path.join(path.dirname(f), 'backups');
+      if (fs.existsSync(ob)) { fs.mkdirSync(nb, { recursive: true }); for (const x of fs.readdirSync(ob)) fs.copyFileSync(path.join(ob, x), path.join(nb, x)); }
+      return;
+    }
   } catch {}
 }
 
 app.whenReady().then(() => {
-  migrateFromQuan();
+  migrateOldData();
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(perm === 'media'));
   createWindow();
   setInterval(checkReminder, 30 * 1000);
@@ -152,41 +154,24 @@ function localDay(d) {
 // Remove the API key file left by older versions (Jinan chats are now fully offline).
 app.whenReady().then(() => { try { fs.unlinkSync(path.join(app.getPath('userData'), 'claude-key.bin')); } catch {} });
 
-// ---------- local AI (Ollama on this Mac; never the internet) ----------
-// The renderer can't reach localhost (CSP), so calls go through here. Replies stream back token by token.
-const OLLAMA = 'http://127.0.0.1:11434';
+// ---------- local AI (built in: llama.cpp on this computer; never the internet) ----------
+// The model file downloads once on request (Settings). Replies stream back token by token.
+const AI = require('./ai-engine');
+AI.init(app.getPath('userData'));
 const aiCalls = new Map();
-ipcMain.handle('ai:status', async (e, model) => {
-  try {
-    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 2500);
-    const r = await fetch(OLLAMA + '/api/tags', { signal: ctl.signal }); clearTimeout(t);
-    const j = await r.json();
-    const names = (j.models || []).map((m) => m.name);
-    return { running: true, models: names, hasModel: names.includes(model) || names.includes(model + ':latest') };
-  } catch { return { running: false, models: [], hasModel: false }; }
-});
+const aiPush = (st) => { if (win && !win.isDestroyed()) win.webContents.send('ai:progress', st); };
+ipcMain.handle('ai:status', () => AI.status());
+ipcMain.handle('ai:download', () => { AI.startDownload(aiPush); return AI.status(); });
+ipcMain.handle('ai:download-cancel', () => AI.cancelDownload());
+ipcMain.handle('ai:remove', () => AI.removeModel());
 ipcMain.handle('ai:chat', async (e, { id, body, timeout }) => {
   const ctl = new AbortController(); aiCalls.set(id, ctl);
   const t = setTimeout(() => ctl.abort(), timeout || 60000);
   try {
-    const send = async (b) => fetch(OLLAMA + '/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b), signal: ctl.signal });
-    let r = await send({ ...body, think: false });
-    if (r.status === 400) { const tx = await r.text(); if (/think/i.test(tx)) r = await send(body); else return { error: tx }; }
-    if (!r.ok) return { error: `${r.status}` };
-    if (!body.stream) { const j = await r.json(); return { text: (j.message && j.message.content) || '' }; }
-    let text = '', buf = '';
-    const dec = new TextDecoder();
-    for await (const chunk of r.body) {
-      buf += dec.decode(chunk, { stream: true });
-      let i;
-      while ((i = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-        if (!line) continue;
-        try { const j = JSON.parse(line); if (j.message && j.message.content) { text += j.message.content; if (!e.sender.isDestroyed()) e.sender.send('ai:token', { id, text }); } } catch {}
-      }
-    }
-    return { text };
+    const r = await AI.chatOnce(body, ctl.signal, (text) => { if (!e.sender.isDestroyed()) e.sender.send('ai:token', { id, text }); });
+    return ctl.signal.aborted && !r.text ? { error: 'timeout' } : r;
   } catch (err) { return { error: ctl.signal.aborted ? 'timeout' : String(err && err.message || err) }; }
   finally { clearTimeout(t); aiCalls.delete(id); }
 });
 ipcMain.handle('ai:cancel', (e, id) => { const c = aiCalls.get(id); if (c) c.abort(); return true; });
+app.on('will-quit', () => { AI.unload(); });

@@ -197,8 +197,8 @@ function askOffline() {
   const st = AI.status();
   if (!AI.cfg().on) return '团团 is asleep: the local AI is turned off in Settings.';
   if (st.unsupported) return '团团 needs the desktop app to think.';
-  if (!st.running) return '团团 is asleep: the local AI (Ollama) isn\'t running. Open Ollama, then ask again.';
-  if (!st.hasModel) return `团团 is asleep: the model ${AI.cfg().model} isn't installed in Ollama.`;
+  if (!st.running) return '团团 is asleep: the local AI couldn\'t start.';
+  if (!st.hasModel) return '团团 is asleep: download the AI model in Settings to wake 团团 up.';
   return '';
 }
 
