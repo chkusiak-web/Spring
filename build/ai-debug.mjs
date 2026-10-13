@@ -2,7 +2,7 @@ import { getLlama, LlamaChat, QwenChatWrapper, resolveModelFile } from 'node-lla
 const path = await resolveModelFile('hf:unsloth/Qwen3.5-0.8B-GGUF/Qwen3.5-0.8B-Q4_K_M.gguf', '/tmp/m');
 const llama = await getLlama();
 const model = await llama.loadModel({ modelPath: path });
-const ctx = await model.createContext({ contextSize: 4096 });
+const ctx = await model.createContext({ contextSize: 4096, sequences: 4 });
 const g = await llama.createGrammarForJsonSchema({ type: 'object', properties: { reply: { type: 'string' } }, required: ['reply'] });
 const hist = [{ type: 'system', text: 'You play 王奶奶. Answer in JSON.' }, { type: 'user', text: '你好！你吃饭了吗？' }];
 const variants = {
