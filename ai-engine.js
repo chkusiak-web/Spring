@@ -68,7 +68,7 @@ async function load() {
   if (chat) return chat;
   if (loading) return loading;
   loading = (async () => {
-    const { getLlama, LlamaChat } = await importLib();
+    const { getLlama, LlamaChat, QwenChatWrapper } = await importLib();
     llama = llama || await getLlama();
     try { model = await llama.loadModel({ modelPath: modelPath() }); }
     catch (err) {
@@ -78,7 +78,8 @@ async function load() {
       model = await llama.loadModel({ modelPath: modelPath() });
     }
     context = await model.createContext({ contextSize: 4096 });
-    chat = new LlamaChat({ contextSequence: context.getSequence() });
+    // "discourage" skips Qwen's thinking step; a zero thought budget instead swallows the reply's first token
+    chat = new LlamaChat({ contextSequence: context.getSequence(), chatWrapper: new QwenChatWrapper({ thoughts: 'discourage' }) });
     return chat;
   })();
   try { return await loading; }
@@ -121,7 +122,6 @@ function chatOnce(body, signal, onText) {
       grammar: body.format && typeof body.format === 'object' ? await grammarFor(body.format) : undefined,
       temperature: o.temperature ?? 0.7,
       maxTokens: o.num_predict || undefined,
-      budgets: { thoughtTokens: 0 },
       signal, stopOnAbortSignal: true,
       onTextChunk: body.stream ? (t) => { text += t; onText(text); } : undefined
     });
