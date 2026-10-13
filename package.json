@@ -1,17 +1,83 @@
 {
-  "name": "tiantian",
+  "name": "spring",
   "version": "3.16.0",
   "description": "Every day, a little Chinese.",
   "main": "main.js",
   "keywords": [],
   "author": "calkusiakfilm",
   "license": "ISC",
-  "dependencies": {},
   "devDependencies": {
-    "@electron/packager": "^20.3.0",
     "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
     "hanzi-writer": "^3.7.3",
     "hanzi-writer-data": "^2.0.1"
   },
-  "productName": "Spring"
+  "productName": "Spring",
+  "dependencies": {
+    "node-llama-cpp": "^3.22.1"
+  },
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac --arm64 --x64 --publish never",
+    "dist:win": "electron-builder --win --x64 --publish never"
+  },
+  "build": {
+    "appId": "com.calkusiak.quan",
+    "productName": "Spring",
+    "copyright": "© 2026 calkusiakfilm",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "ai-engine.js",
+      "app/**",
+      "package.json",
+      "!node_modules/@node-llama-cpp/*cuda*/**",
+      "!node_modules/node-llama-cpp/llama/{llama.cpp,gitRelease.bundle}/**"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/node-llama-cpp/bins/**",
+      "node_modules/node-llama-cpp/llama/localBuilds/**",
+      "node_modules/@node-llama-cpp/**"
+    ],
+    "artifactName": "Spring-${version}-${os}-${arch}.${ext}",
+    "afterPack": "build/adhoc-sign.js",
+    "mac": {
+      "category": "public.app-category.education",
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": null,
+      "minimumSystemVersion": "13.0",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Spring records your voice so you can compare your pronunciation with the model audio."
+      }
+    },
+    "dmg": {
+      "title": "Spring ${version}"
+    },
+    "win": {
+      "icon": "build/i512.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "shortcutName": "Spring"
+    }
+  }
 }
