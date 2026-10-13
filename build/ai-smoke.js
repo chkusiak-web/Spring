@@ -4,6 +4,8 @@ const os = require('os'), path = require('path');
 const E = require('../ai-engine');
 E.init(path.join(os.tmpdir(), 'spring-smoke'));
 const sig = () => AbortSignal.timeout(300000);
+process.on('exit', (c) => console.log('exit code', c));
+process.on('unhandledRejection', (e) => { console.error('unhandled', e); });
 (async () => {
   let last = 0;
   const st = await E.startDownload((s) => { const p = s.download ? Math.floor(100 * s.download.done / s.download.total) : 100; if (p >= last + 25) console.log('download', (last = p) + '%'); });
@@ -19,6 +21,12 @@ const sig = () => AbortSignal.timeout(300000);
   console.log('check:', r2.text); JSON.parse(r2.text);
   const r3 = await E.chatOnce({ messages: [{ role: 'system', content: 'You are a helpful panda tutor.' }, { role: 'user', content: 'What does 你好 mean?' }], stream: true, options: { temperature: 0.4, num_predict: 60 } }, sig(), () => {});
   console.log('mentor:', r3.text); if (!r3.text.trim()) throw new Error('empty mentor reply');
+  // unloading happens after 20 idle minutes in the app, so it must not take the process down
+  console.log('unloading…');
+  await E.unload();
+  console.log('unloaded');
+  const r4 = await E.chatOnce({ messages: [sys, { role: 'user', content: '再见！' }], format: REPLY, stream: false, options: { temperature: 0, num_predict: 60 } }, sig());
+  console.log('after reload:', r4.text); JSON.parse(r4.text);
   await E.unload();
   console.log('AI smoke test passed');
 })().catch((e) => { console.error(e); process.exit(1); });
